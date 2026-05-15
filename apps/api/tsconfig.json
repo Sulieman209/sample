@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "noEmit": false,
+    "outDir": "dist",
+    "paths": {
+      "@/*": ["src/*"],
+      "@tutoring-saas/types": ["../../packages/types/src/index.ts"],
+      "@tutoring-saas/utils": ["../../packages/utils/src/index.ts"]
+    },
+    "types": ["node"]
+  },
+  "include": ["src", "prisma"]
+}

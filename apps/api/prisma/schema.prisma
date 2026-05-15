@@ -1,0 +1,329 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  STUDENT
+  TUTOR
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum TutorStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  SUSPENDED
+}
+
+enum CourseStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  EXPIRED
+}
+
+enum PaymentProvider {
+  STRIPE
+  PAYSTACK
+}
+
+enum ClassStatus {
+  SCHEDULED
+  LIVE
+  COMPLETED
+  CANCELED
+}
+
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+model User {
+  id            String         @id @default(cuid())
+  clerkId       String         @unique
+  email         String         @unique
+  firstName     String?
+  lastName      String?
+  imageUrl      String?
+  role          UserRole       @default(STUDENT)
+  student       Student?
+  tutor         Tutor?
+  admin         Admin?
+  supportTickets SupportTicket[]
+  sentMessages  Message[]      @relation("SentMessages")
+  notifications Notification[]
+  auditLogs     AuditLog[]     @relation("AuditActor")
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([role])
+}
+
+model Student {
+  id            String             @id @default(cuid())
+  userId        String             @unique
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  timezone      String             @default("UTC")
+  country       String?
+  subscriptions Subscription[]
+  progress      ProgressTracking[]
+  attendance    ClassAttendance[]
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+}
+
+model Tutor {
+  id             String        @id @default(cuid())
+  userId         String        @unique
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject        String
+  bio            String?
+  hourlyRateCents Int?
+  currency       String        @default("USD")
+  status         TutorStatus   @default(DRAFT)
+  country        String?
+  language       String?
+  courses        Course[]
+  classes        Class[]
+  certificates   Certificate[]
+  payouts        Payout[]
+  reviews        Review[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([subject])
+  @@index([status])
+}
+
+model Admin {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Course {
+  id              String             @id @default(cuid())
+  tutorId         String
+  tutor           Tutor              @relation(fields: [tutorId], references: [id], onDelete: Restrict)
+  title           String
+  slug            String             @unique
+  description     String
+  subject         String
+  thumbnailKey    String?
+  status          CourseStatus       @default(DRAFT)
+  modules         CourseModule[]
+  classes         Class[]
+  reviews         Review[]
+  progressRecords ProgressTracking[]
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([subject])
+  @@index([status])
+}
+
+model CourseModule {
+  id        String   @id @default(cuid())
+  courseId  String
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title     String
+  position  Int
+  lessons   Lesson[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([courseId, position])
+}
+
+model Lesson {
+  id          String   @id @default(cuid())
+  moduleId    String
+  module      CourseModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  title       String
+  content     String?
+  videoKey    String?
+  pdfKey      String?
+  fileKey     String?
+  position    Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([moduleId, position])
+}
+
+model Subscription {
+  id                 String             @id @default(cuid())
+  studentId          String
+  student            Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  provider           PaymentProvider
+  providerCustomerId String
+  providerPlanId     String
+  status             SubscriptionStatus
+  currentPeriodEnd   DateTime
+  payments           Payment[]
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+}
+
+model Payment {
+  id             String          @id @default(cuid())
+  subscriptionId String?
+  subscription   Subscription?   @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  provider       PaymentProvider
+  reference      String          @unique
+  amountCents    Int
+  currency       String
+  paidAt         DateTime?
+  createdAt      DateTime        @default(now())
+}
+
+model Payout {
+  id          String   @id @default(cuid())
+  tutorId     String
+  tutor       Tutor    @relation(fields: [tutorId], references: [id], onDelete: Restrict)
+  amountCents Int
+  currency    String
+  processedAt DateTime?
+  createdAt   DateTime @default(now())
+}
+
+model Class {
+  id             String            @id @default(cuid())
+  tutorId        String
+  tutor          Tutor             @relation(fields: [tutorId], references: [id], onDelete: Restrict)
+  courseId       String?
+  course         Course?           @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  title          String
+  startsAt       DateTime
+  endsAt         DateTime
+  timezone       String
+  maxStudents    Int
+  googleMeetUrl  String?
+  googleEventId  String?
+  status         ClassStatus       @default(SCHEDULED)
+  attendance     ClassAttendance[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([startsAt])
+  @@index([status])
+}
+
+model ClassAttendance {
+  id        String   @id @default(cuid())
+  classId   String
+  class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  studentId String
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  joinedAt  DateTime?
+  leftAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@unique([classId, studentId])
+}
+
+model ChatRoom {
+  id        String    @id @default(cuid())
+  messages  Message[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Message {
+  id         String   @id @default(cuid())
+  roomId     String
+  room       ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  senderId   String
+  sender     User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Restrict)
+  body       String
+  attachmentKey String?
+  readAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([roomId, createdAt])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+}
+
+model SupportTicket {
+  id        String              @id @default(cuid())
+  userId    String
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject   String
+  body      String
+  status    SupportTicketStatus @default(OPEN)
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  tutorId   String?
+  tutor     Tutor?   @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  courseId  String?
+  course    Course?  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  rating    Int
+  body      String?
+  createdAt DateTime @default(now())
+}
+
+model ProgressTracking {
+  id        String   @id @default(cuid())
+  studentId String
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  courseId  String
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  percent   Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([studentId, courseId])
+}
+
+model Certificate {
+  id        String   @id @default(cuid())
+  tutorId   String
+  tutor     Tutor    @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  title     String
+  fileKey   String
+  issuedBy  String?
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  actor     User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  action    String
+  entity    String
+  entityId  String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+}
