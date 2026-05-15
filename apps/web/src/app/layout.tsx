@@ -1,6 +1,7 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import "@/app/globals.css";
+import { isClerkConfigured } from "@/config/auth";
 import { AppProviders } from "@/providers/app-providers";
 
 export const metadata: Metadata = {
@@ -13,13 +14,17 @@ type RootLayoutProps = {
 };
 
 export default function RootLayout({ children }: RootLayoutProps) {
-  return (
-    <ClerkProvider>
-      <html lang="en" suppressHydrationWarning>
-        <body className="min-h-screen font-sans antialiased">
-          <AppProviders>{children}</AppProviders>
-        </body>
-      </html>
-    </ClerkProvider>
+  const app = (
+    <html lang="en" suppressHydrationWarning>
+      <body className="min-h-screen font-sans antialiased">
+        <AppProviders>{children}</AppProviders>
+      </body>
+    </html>
   );
+
+  if (!isClerkConfigured()) {
+    return app;
+  }
+
+  return <ClerkProvider>{app}</ClerkProvider>;
 }
