@@ -1,7 +1,5 @@
 import Link from "next/link";
-import { UserButton } from "@clerk/nextjs";
 import { BookOpen, CalendarDays, GraduationCap, LifeBuoy, MessageSquare } from "lucide-react";
-import { isClerkConfigured } from "@/config/auth";
 import { ThemeToggle } from "@/features/app-shell/components/theme-toggle";
 
 const navigationItems = [
@@ -17,8 +15,6 @@ type AppShellProps = {
 };
 
 export function AppShell({ children }: AppShellProps) {
-  const hasAuth = isClerkConfigured();
-
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur">
@@ -28,7 +24,6 @@ export function AppShell({ children }: AppShellProps) {
           </Link>
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            {hasAuth ? <UserButton afterSignOutUrl="/" /> : null}
           </div>
         </div>
       </header>
